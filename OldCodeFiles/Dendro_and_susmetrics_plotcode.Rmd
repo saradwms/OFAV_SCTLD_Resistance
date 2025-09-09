@@ -1,0 +1,181 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r load packages, results='hide',message=FALSE, warning=FALSE}
+library(FD)         # gower dissimiliarity matrix and some other 
+#clustering stuff
+library(ggplot2)    # plotting
+library(vegan)      # stats
+library(tidyverse)  # data manipulation
+#cluster numbers
+library(mclust)     # normal mixture modeling for model based clustering,
+#customize denddrogram
+library(dendextend) 
+library(ggdendro)
+library(patchwork)
+```
+
+## can start here
+```{r}
+GenoDF<-read.csv("RiskbyDEPGenotype_V032024.csv",row.names = 1)
+```
+
+
+
+```{r,fig.width=10,fig.height=4}
+
+data_gdisall<-gowdis(GenoDF[,c(5,6,8)])
+hc_gowdisall <- hclust(data_gdisall, method = "ward.D2" )
+dendall <- as.dendrogram(hc_gowdisall)
+dendall
+
+par(cex=0.4, mar=c(10, 5, 5, 2))
+plot(dendall, xlab="", ylab="", main="", sub="", axes=FALSE)
+par(cex=.7)
+title(xlab="Genotypes", ylab="Clustering Height")
+axis(2)
+
+dall<-dendro_data(dendall,type="rectangle")
+groupsall<-cutree(hc_gowdisall,5)
+GenoDF$sus.groups<-as.factor(groupsall)
+GenoDF[order(GenoDF[,9],decreasing=T),]
+labs<-right_join(dall$labels,GenoDF,by=c("label"="DEP.Genotype"))
+
+alldendplot<-ggplot(dall$segments) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend))+
+  geom_text(data = dall$labels, aes(x, y, label = label,color=labs$sus.groups),
+            hjust = 1.2, angle = 90, size = 2)+
+  geom_point(data = dall$labels, aes(x, y,color=labs$sus.groups),size=.5)+
+  scale_y_continuous(limits=c(-1,4.5),breaks=seq(0,4.5,0.5))+
+  theme_bw()+
+  scale_color_manual(values=c("orange1","red3","springgreen4","steelblue3","palegreen2"))+
+  theme(legend.position = "none")+labs(color="Cluster",y="Clustering Height",x="")+
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank())+guides(color=guide_legend(override.aes = list(size=5)))
+
+alldendplot
+#ggsave("justdendro_all5clusters.png",dpi=300)
+```
+
+1 is susceptbile, 2 is highly susceptible, 3 is resistant, 4 is intermediate, 5 is 1/1 resistant
+```{r}
+GenoDF$sus<-GenoDF$sus.groups
+levels(GenoDF$sus)<-c("Susceptible","Highly Susceptible","Resistant","Intermediate","1/1 Resistant")
+GenoDF$sus<-factor(GenoDF$sus,c("Highly Susceptible","Susceptible","Intermediate","Resistant","1/1 Resistant"))
+```
+
+
+```{r,fig.width=9,fig.height=3}
+p1<-ggplot(GenoDF,aes(x=sus,y=avgDaysDiseased.std,fill=sus,alpha=1))+
+  geom_boxplot()+
+  geom_point(aes(color=sus),position=position_jitterdodge(jitter.height=0,jitter.width=0.7),alpha=0.5)+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  scale_color_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Progression")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+p1
+p2<-ggplot(GenoDF,aes(x=sus,y=avgFracExpHealthy,fill=sus,alpha=1))+
+  geom_boxplot()+
+  geom_point(aes(color=sus),position=position_jitterdodge(jitter.height=0,jitter.width=0.7),alpha=0.5)+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  scale_color_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+   theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Transmission")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+p3<-ggplot(GenoDF,aes(x=sus,y=FracHealthy,fill=sus,alpha=1))+
+  geom_boxplot()+
+  geom_point(aes(color=sus),position=position_jitterdodge(jitter.height=0,jitter.width=0.7),alpha=0.5)+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  scale_color_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+   theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Resistance")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+
+p3+p2+p1
+#ggsave("susmetrics_all5clusters.png",dpi=300)
+```
+
+```{r,fig.width=10,fig.height=6}
+alldendplot/(p3+p2+p1)
+#ggsave("AllDEPGenos5clusters_v060924.png",dpi=300)
+```
+
+
+## Now just the ones with 3 or more replicates
+```{r}
+GenoDFsub3<-subset(GenoDF,subset=Exposed>2)
+
+```
+
+
+```{r,fig.width=10,fig.height=4}
+
+data_gdisall<-gowdis(GenoDFsub3[,c(5,6,8)])
+hc_gowdisall <- hclust(data_gdisall, method = "ward.D2" )
+dendall <- as.dendrogram(hc_gowdisall)
+dendall
+
+par(cex=0.4, mar=c(10, 5, 5, 2))
+plot(dendall, xlab="", ylab="", main="", sub="", axes=FALSE)
+par(cex=.7)
+title(xlab="Genotypes", ylab="Clustering Height")
+axis(2)
+
+dall<-dendro_data(dendall,type="rectangle")
+groupsall<-cutree(hc_gowdisall,4)
+GenoDFsub3$sus.groups<-as.factor(groupsall)
+GenoDFsub3[order(GenoDFsub3[,9],decreasing=T),]
+labs<-right_join(dall$labels,GenoDFsub3,by=c("label"="DEP.Genotype"))
+
+alldendplot<-ggplot(dall$segments) + 
+  geom_segment(aes(x = x, y = y, xend = xend, yend = yend))+
+  geom_text(data = dall$labels, aes(x, y, label = label,color=labs$sus.groups),
+            hjust = 1.2, angle = 90, size = 2)+
+  geom_point(data = dall$labels, aes(x, y,color=labs$sus.groups),size=.5)+
+  scale_y_continuous(limits=c(-0.5,2.5),breaks=seq(0,2.5,0.5))+
+  theme_bw()+
+  scale_color_manual(values=c("red3","steelblue3","orange1","springgreen4","palegreen2"))+
+  theme(legend.position = "none")+labs(color="Cluster",y="Clustering Height",x="")+
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank())+guides(color=guide_legend(override.aes = list(size=5)))
+
+alldendplot
+#ggsave("justdendro_all5clusters.png",dpi=300)
+```
+
+1 is highly susceptbile, 2 is intermediate, 3 issusceptible, 4 is resistant
+```{r}
+GenoDFsub3$sus<-GenoDFsub3$sus.groups
+levels(GenoDFsub3$sus)<-c("Highly Susceptible","Intermediate","Susceptible","Resistant")
+GenoDFsub3$sus<-factor(GenoDFsub3$sus,c("Highly Susceptible","Susceptible","Intermediate","Resistant"))
+```
+
+```{r,fig.width=9,fig.height=3}
+p1<-ggplot(GenoDFsub3,aes(x=sus,y=avgDaysDiseased.std,fill=sus))+
+  geom_boxplot()+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Progression")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+p2<-ggplot(GenoDFsub3,aes(x=sus,y=avgFracExpHealthy,fill=sus))+
+  geom_boxplot()+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Transmission")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+p3<-ggplot(GenoDFsub3,aes(x=sus,y=FracHealthy,fill=sus))+
+  geom_boxplot()+
+  scale_fill_manual(values=c("red3","orange1","steelblue3","springgreen4","palegreen2"))+
+  theme_bw()+
+  theme(legend.position = 'none')+labs(x="",y="Resistance")+theme(axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(limits=c(0,1),breaks=seq(0,1,0.1))
+
+p3+p2+p1
+#ggsave("susmetrics_all5clusters.png",dpi=300)
+```
+
+
+```{r,fig.width=10,fig.height=6}
+alldendplot/(p3+p2+p1)
+#ggsave("3repsormore_4clusters_v060924.png",dpi=300)
+```

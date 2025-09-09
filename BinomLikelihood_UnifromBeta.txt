@@ -1,0 +1,15 @@
+model
+{
+for (i in 1:k) {
+#Prior
+a[i] ~dbeta(1,1)
+c[i] ~dbeta(1,1)
+# Likelihood
+h[i] ~ dbin(a[i],r[i])
+l[i] ~ dbin(c[i],m[i])
+RRISK[i] <- a[i]/c[i]
+OR[i]<- (a[i]/(1-a[i]))/(c[i]/(1-c[i]))
+lnOR[i]<-log(OR[i])
+ppos[i]<-step(OR[i]-1)
+}
+}

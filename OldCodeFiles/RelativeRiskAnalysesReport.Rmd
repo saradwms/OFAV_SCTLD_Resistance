@@ -1,0 +1,126 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Load libraries needed
+library(R2OpenBUGS)
+library(ggplot2)
+library(MASS)
+library(scales)
+```
+
+
+## For the Experiment
+
+```{r}
+all.exps<-read.csv("CombinedExperimentsIndividuals_V032024.csv",row.names = 1)
+
+table(all.exps$Experiment, all.exps$Result)
+
+```
+
+```{r}
+
+#number of experiments
+k<-4
+#values go in genotype order
+#total number of experimental corals with disease
+h<-c(58,84,91,62)
+#total number of experimental corals 
+r<-c(19+58,12+84,9+91,11+62)
+#the total number of control corals with disease
+l<-c(0,0,0,0)
+#total number of control corals 
+m<-c(77,96,100,73)
+
+
+params<- list(k=k,h=h,r=r,l=l,m=m)
+
+# Initial values
+inits <- function() {
+  list(nu=1, alpha=1)}
+
+# Load model
+
+RBayes <- bugs(params, inits, model.file= "BinomLikelihood_UnifromBeta.txt",
+                parameters = c("RRISK"),
+                n.chains = 1, DIC=TRUE, n.iter = 3000, debug=FALSE)
+# Model output
+RBayes
+```
+
+```{r}
+### Extract the relative risk info needed for a catterpillar plot
+rrdata<-as.data.frame(RBayes$summary)[-nrow(RBayes$summary),]
+rrdata$RRmed<-RBayes$median$RRISK
+Experiments<-c("Experiment 1","Experiment 2","Experiment 3","Experiment 4")
+
+```
+
+```{r}
+ggplot(rrdata,aes(x=RRmed,y=Experiments))+
+  geom_point()+
+  geom_linerange(aes(xmax=rrdata$`97.5%`, xmin=rrdata$`2.5%`),col="black")+
+  geom_vline(xintercept=1,lwd=0.7)+
+  scale_x_log10(breaks=trans_breaks("log10",function(x) 10^x),labels = trans_format("log10", math_format(10^.x)))+
+  theme_bw()+annotation_logticks(sides="b")+labs(y="",x="Median Relative Risk",size=12)+theme(axis.text.y = element_text(size=12))
+
+```
+### Standardized mortality ratio for outplant data
+
+```{r}
+fielddf<-read.csv("FieldStudyWGS.csv")
+
+# Ratio of the average # of observed diseases to total population, e.g. sum all cases of WBD across regions and divide by the sum of all acropora across regions
+r<-sum(fielddf$Diseased.Fragment.Count)/sum(fielddf$Number.Outplanted)
+
+# Calculate average expected # diseased corals for each region by multiplying the r value calculated above for the population by the number of acropora in that region
+fielddf$Expected<-fielddf$Number.Outplanted *r 
+
+###################################################################
+# Poisson-gamma relative risk model
+# Bayesian analysis using the Poisson_Gamma_RR_Model.txt file
+# White band disease on Acropora
+###################################################################
+
+# Data needed for the model
+#number of observations (regions)
+N<-nrow(fielddf) 
+#list of parameters
+d<-list(N=N, observed=fielddf$Diseased.Fragment.Count, expected=fielddf$Expected)
+
+# Initial values (used to constrain the gamma distribution in the model)
+inits <- function() {
+  list(nu=1, alpha=1)}
+
+# Load model
+
+RBayes <- bugs(d, inits, model.file= "Poisson_Gamma_RR_Model.txt",
+                parameters = c("theta", "nu", "alpha"),
+                n.chains = 1, DIC=TRUE, n.iter = 3000, debug=FALSE)
+# Model output
+RBayes
+plot(RBayes)
+```
+```{r}
+### Extract the relative risk info needed for a catterpillar plot
+rrdata<-as.data.frame(RBayes$summary)[1:8,]
+rrdata$RRmed<-RBayes$median$theta
+rrdata$Genotypes<-fielddf$New.Geno.Name
+rrdata$DEPgenos<-fielddf$DEP.Genotype
+rrdata$Susgroup<-fielddf$Rgroup
+rrdata$Susgroup<-factor(rrdata$Susgroup,c("Highly Susceptible","Intermediate","1/1 Resistant"))
+rrdata$Names<-fielddf$ComboGeno
+```
+
+```{r}
+ggplot(rrdata,aes(x=RRmed,y=reorder(Names,-RRmed),col=Susgroup))+
+  geom_point(size=3)+
+  geom_linerange(aes(xmax=rrdata$`97.5%`, xmin=rrdata$`2.5%`,col=Susgroup),lwd=1)+
+  geom_vline(xintercept=1,lwd=.5)+
+  scale_x_log10(breaks=trans_breaks("log10",function(x) 10^x),labels = trans_format("log10", math_format(10^.x)))+
+  theme_bw()+annotation_logticks(sides="b")+labs(y=" ",x="Median Relative Risk",col="")+scale_color_manual(values=c("red3","steelblue","palegreen2"))+theme(legend.position='bottom')+theme(axis.text.y = element_text(size=12),axis.text = element_text(size=12))
+
+```

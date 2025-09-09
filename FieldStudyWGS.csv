@@ -1,0 +1,9 @@
+Species,Geno,New Geno Name,DEP.Genotype,Rgroup,Number Outplanted,Diseased Fragment Count,Note,ComboGeno
+Ofav,F1,OF1,WGS-18,Highly Susceptible,25,6,,WGS-18 / OF1
+Ofav,F1A,OF2,WGS-53,1/1 Resistant,30,0,,WGS-53 / OF2
+Ofav,F3A,OF3,WGS-58,Intermediate,25,3,,WGS-58 / OF3
+Ofav,F8,OF8,WGS-155,Highly Susceptible,75,19,,WGS-155 / OF8
+Ofav,F27,OF27,WGS-12,Highly Susceptible,110,24,OF12 mote clone,WGS-12 / OF27
+Ofav,F61,OF61,WGS-152,Highly Susceptible,210,54,,WGS-152 / OF61
+Ofav,F125,OF125 & OF132,WGS-154,Highly Susceptible,390,30,,WGS-154 / OF125 & OF132
+Ofav,F126,OF126,WGS-50,1/1 Resistant,20,0,,WGS-50 / OF126
